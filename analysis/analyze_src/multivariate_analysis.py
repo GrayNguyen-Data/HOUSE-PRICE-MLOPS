@@ -24,10 +24,11 @@ class SimpleMultivariateAnalysis(MultivariateAnalysisTemplate):
         sns.heatmap(df.corr(), annot = True, fmt =".2f", cmap="coolwarm", linewidths=0.5)
         plt.title("Correlation Heatmap")
         plt.show()
+
     def visualization_matrix(self, df: pd.DataFrame):
         """Hiển thị ma trận biểu đồ phân tán"""
         sns.pairplot(df)
-        plt.suptitle("Pair Plot of Selected Features",)
+        plt.suptitle("Pair Plot of Selected Features",y=1.02)
         plt.show()
 
 if __name__ == "__main__":
