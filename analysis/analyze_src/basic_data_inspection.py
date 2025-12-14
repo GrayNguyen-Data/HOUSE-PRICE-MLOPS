@@ -1,9 +1,5 @@
 from abc import ABC, abstractmethod
 import pandas as pd
-import sys
-import codecs
-
-sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
 """Lớp Product - định nghĩa lớp inspect cho tất cả class con sài"""
 class DataIngestionStrategy(ABC):
