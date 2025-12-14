@@ -147,3 +147,17 @@ Các cột về thời điểm bán và loại giao dịch:
 ***Nhóm 8: Target***
 
 `SalePrice:` Giá bán ngôi nhà (biến mục tiêu khi làm mô hình dự đoán).
+
+---
+
+**LIÊN HỆ**
+---
+Cảm ơn bạn đã ghé thăm dự án của tôi❤️
+
+Nếu bạn muốn kết nối, đừng ngần ngại liên hệ với tôi nhé!
+
+📧 Email: ndtoan.work@gmail.com
+
+💼 LinkedIn: https://www.linkedin.com/in/ndtoanwork/
+
+📍 Địa điểm: Bình Thạnh, TP. Hồ Chí Minh, Việt Nam
