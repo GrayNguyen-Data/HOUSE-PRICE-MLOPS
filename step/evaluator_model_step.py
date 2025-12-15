@@ -1,39 +1,96 @@
+
+from zenml import step, Model
+from zenml.steps import get_step_context
+from typing import Annotated, Dict
 import logging
-from typing import Tuple
-
 import pandas as pd
-from sklearn.metrics import mean_squared_error, r2_score
+
 from sklearn.pipeline import Pipeline
-from zenml import step
+from sklearn.metrics import mean_squared_error, r2_score
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
-@step(enable_cache=False)
+model_object = Model(
+    name="prices_predictor",
+    description="House price prediction model for HCM City",
+)
+
+@step(
+    enable_cache=False,
+    model=model_object,
+)
 def model_evaluator_step(
-    trained_model: Pipeline, X_test: pd.DataFrame, y_test: pd.Series
-) -> Tuple[dict, float, float]:
-    """
-    Đánh giá mô hình hồi quy đã huấn luyện.
+    trained_model: Annotated[Pipeline, "trained_model"],
+    X_test: Annotated[pd.DataFrame, "X_test"],
+    y_test: Annotated[pd.DataFrame, "y_test"],
+) -> Annotated[Dict[str, float], "evaluation_metrics"]:
 
-    Trả về:
-    dict: Dictionary chứa các metric đánh giá (MSE, R2)
-    float: Mean Squared Error
-    float: R² score
-    """
+    logging.info("BẮT ĐẦU MODEL EVALUATION STEP")
 
-    if not isinstance(X_test, pd.DataFrame):
-        raise TypeError("X_test phải là pandas DataFrame.")
-    if not isinstance(y_test, pd.Series):
-        raise TypeError("y_test phải là pandas Series.")
+    # 1. Ensure y_test is Series
+    if isinstance(y_test, pd.DataFrame):
+        y_test = y_test.iloc[:, 0]
+        logging.info("Converted y_test DataFrame -> Series")
 
-    logging.info("Thực hiện dự đoán trên dữ liệu test.")
+    # 2. Predict
     y_pred = trained_model.predict(X_test)
 
-    # Tính metric
+    # 3. Metrics
     mse = mean_squared_error(y_test, y_pred)
     r2 = r2_score(y_test, y_pred)
-    evaluation_metrics = {"Mean Squared Error": mse, "R2 Score": r2}
 
-    logging.info(f"Đánh giá hoàn tất. MSE = {mse}, R² = {r2}")
+    logging.info(f"✅ Evaluation finished | MSE={mse:.4f} | R²={r2:.4f}")
 
-    return evaluation_metrics, mse, r2
+    # 4. STEP CONTEXT
+    step_context = get_step_context()
+
+    # LOG METADATA → OUTPUT ARTIFACT (DASHBOARD HIỆN)
+    step_context.add_output_metadata(
+        output_name="evaluation_metrics",
+        metadata={
+            "mse": float(mse),
+            "r2": float(r2),
+            "num_features": int(X_test.shape[1]),
+            "num_test_samples": int(X_test.shape[0]),
+        },
+    )
+
+    logging.info("Metrics đã được lưu vào OUTPUT artifact metadata")
+
+    # 5. MODEL VERSION METADATA
+    model_version = step_context.model
+
+    model_version.log_metadata(
+        {
+            "mse": float(mse),
+            "r2": float(r2),
+            "num_features": int(X_test.shape[1]),
+            "num_test_samples": int(X_test.shape[0]),
+            "r2_threshold": 0.85,
+        }
+    )
+
+    logging.info("Metrics đã được lưu vào Model Version metadata")
+
+    # 6. Promotion logic
+    if r2 >= 0.85:
+        model_version.set_stage("production", force=True)
+        model_version.log_metadata({"promoted_to_production": True})
+
+        logging.info(
+            f"🚀 Model version {model_version.version} PROMOTED to PRODUCTION"
+        )
+    else:
+        model_version.log_metadata({"promoted_to_production": False})
+        logging.warning("Model NOT promoted")
+
+    logging.info("KẾT THÚC MODEL EVALUATION STEP")
+
+    # 7. Return artifact
+    return {
+        "mse": float(mse),
+        "r2": float(r2),
+    }

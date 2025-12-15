@@ -1,3 +1,4 @@
+# File: training_pipeline.py (Phiên bản TỐI ƯU/TỰ ĐỘNG)
 
 from step.data_ingestion_step import data_ingestion_step
 from step.data_splitter_step import data_splitter_step
@@ -6,48 +7,84 @@ from step.handle_missing_value_step import handle_missing_values_step
 from step.model_building_step import model_building_step
 from step.evaluator_model_step import model_evaluator_step
 from step.outlier_detection_step import outlier_detection_step
-from zenml import Model, pipeline, step
+from zenml import Model, pipeline
+from typing import Annotated, Tuple
+import pandas as pd
+from sklearn.pipeline import Pipeline
+from zenml import ArtifactConfig
+import logging
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 @pipeline(
-    model=Model(
-        # The name uniquely identifies this model
-        name="prices_predictor"
-    ),
+    model=Model(name="prices_predictor"),
+    enable_cache=False
 )
-def ml_pipeline():
+def ml_pipeline() -> Tuple[Annotated[Pipeline, "trained_model_pipeline"], Annotated[dict, "evaluation_metrics"]]:
     """Define an end-to-end machine learning pipeline."""
 
-    # Data Ingestion Step
-    raw_data = data_ingestion_step(
-        file_path="/Users/ayushsingh/Desktop/end-to-end-production-grade-projects/prices-predictor-system/data/archive.zip"
+    logging.info("--- BẮT ĐẦU ML PIPELINE ---")
+    target_column = "SalePrice"
+    
+    # 1. Data Ingestion
+    raw_data: Annotated[pd.DataFrame, ArtifactConfig("raw_data")] = data_ingestion_step(
+        file_path="D:\\Project_Portfolio\\HOUSE-PRICE-MLOPS\\data\\storage.zip"
     )
 
-    # Handling Missing Values Step
-    filled_data = handle_missing_values_step(raw_data)
+    # 2. Handling Missing Values - NUMERIC COLUMNS (Điền mean cho các cột số)
+    filled_numeric_data: Annotated[pd.DataFrame, ArtifactConfig("filled_numeric_data")] = handle_missing_values_step(
+        df=raw_data, 
+        strategy="mean"
+    )
+    # Bước này không xử lý NaN trong cột object (string).
 
-    # Feature Engineering Step
-    engineered_data = feature_engineering_step(
-        filled_data, strategy="log", features=["Gr Liv Area", "SalePrice"]
+    # 3. Handling Missing Values - CATEGORICAL COLUMNS (BẮT BUỘC TRƯỚC OHE)
+    # Điền giá trị thiếu bằng chuỗi "Missing" để OHE không gặp lỗi NaN.
+    filled_data_final: Annotated[pd.DataFrame, ArtifactConfig("filled_data_final")] = handle_missing_values_step(
+        df=filled_numeric_data, 
+        strategy="constant",
+        fill_value="Missing" 
     )
 
-    # Outlier Detection Step
-    clean_data = outlier_detection_step(engineered_data, column_name="SalePrice")
-
-    # Data Splitting Step
-    X_train, X_test, y_train, y_test = data_splitter_step(clean_data, target_column="SalePrice")
-
-    # Model Building Step
-    model = model_building_step(X_train=X_train, y_train=y_train)
-
-    # Model Evaluation Step
-    evaluation_metrics, mse = model_evaluator_step(
-        trained_model=model, X_test=X_test, y_test=y_test
+    # 4. FEATURE ENGINEERING: ONE-HOT ENCODING (Tự động chọn cột object)
+    # features=None sẽ kích hoạt logic tự động tìm cột object đã sửa trong src/feature_engineering.py.
+    encoded_data: Annotated[pd.DataFrame, ArtifactConfig("encoded_data")] = feature_engineering_step(
+        df=filled_data_final, 
+        strategy="onehot_encoding", 
+        features=None # ⬅️ Kích hoạt tự động chọn cột object
     )
 
-    return model
+    # 5. Feature Engineering: LOG TRANSFORMATION (Áp dụng cho cột số)
+    engineered_data: Annotated[pd.DataFrame, ArtifactConfig("engineered_data")] = feature_engineering_step(
+        df=encoded_data, 
+        strategy="log",
+        features=["Gr Liv Area", target_column] # Vẫn cần chỉ định thủ công các cột cần Log Transform
+    )
+    
+    # 6. Outlier Detection Step
+    clean_data: Annotated[pd.DataFrame, ArtifactConfig("clean_data")] = outlier_detection_step(
+        df=engineered_data
+    )
 
+    # 7. Data Splitting Step
+    X_train, y_train, X_test, y_test = data_splitter_step(
+        df=clean_data,
+        target_column=target_column
+    )
 
-if __name__ == "__main__":
-    # Running the pipeline
-    run = ml_pipeline()
+    # 8. Model Building Step
+    trained_model: Annotated[Pipeline, ArtifactConfig("sklearn_pipeline")] = model_building_step(
+        X_train=X_train, 
+        y_train=y_train
+    )
+
+    # 9. Model Evaluation Step
+    evaluation_metrics: Annotated[dict, ArtifactConfig("evaluation_metrics")] = model_evaluator_step(
+        trained_model=trained_model,
+        X_test=X_test,
+        y_test=y_test
+    )
+    
+    logging.info("--- HOÀN TẤT ML PIPELINE ---")
+
+    return trained_model, evaluation_metrics
