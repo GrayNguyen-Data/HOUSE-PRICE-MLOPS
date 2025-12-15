@@ -1,12 +1,37 @@
-<h1 align="center">HousePrice-MLOps</h1>
+<h1 align="center">MLOps Pipeline for House Price Prediction</h1>
 
 <h3 align="center">
-Dự án dự đoán giá nhà được xây dựng và triển khai theo quy trình MLOps hiện đại, 
-kết hợp tự động hóa pipeline, container hóa và triển khai trên nền tảng đám mây.
+MLOps Pipeline for House Price Prediction là dự án machine learning dự đoán giá nhà, được thiết kế theo hướng End-to-End MLOps với ZenML.
 </h3>
 
 ---
-#### **Thiết lập môi trường ảo cho Python**
+
+### **Quy trình làm việc của dự án, bao gồm:**
+
+- Tiền xử lý dữ liệu (Data Preprocessing).
+
+- Feature Engineering.
+
+- Huấn luyện & đánh giá mô hình.
+
+- Logging metadata & metrics.
+
+- Quản lý version mô hình (Model Registry).
+
+- Tự động chọn mô hình tốt nhất.
+---
+
+### **Bài toán**
+
+**Mục tiêu:** Dự đoán giá bán nhà (SalePrice)
+
+**Loại bài toán:** Supervised Learning – Regression
+
+**Dataset:** Ames Housing Dataset
+
+---
+
+### **Thiết lập môi trường ảo cho Python**
 **Bước 1**: Tạo môi trường ảo (venv)
 ```
 python -m venv venv
@@ -25,6 +50,27 @@ pip install -r requirements.txt
 ```
 pip freeze > requirements.txt
 ```
+**Bước 5**: Khởi tạo ZenML
+```
+zenml init
+```
+**Bước 6**: Chạy ZenML local
+```
+zenml up
+```
+**Bước 6**: Chạy dự án
+```
+python run_pipeline.py
+```
+
+**KẾT QUẢ NHẬN ĐƯỢC**
+- Logs của dự án từ đầu tới cuối.
+- Các metrics(MSE, R2) được dưới dưới dạng database trong ZenML Model Registry.
+- Mô hình được quản lý qua các lệnh CLI.
+```
+zenml model version list
+```
+---
 
 #### **THÔNG TIN DỰ ÁN**
 
@@ -150,6 +196,59 @@ Các cột về thời điểm bán và loại giao dịch:
 
 ---
 
+### **Kiến Trúc MLOps PipeLine**
+---
+Pipeline được xây dựng bằng ZenML, gồm các bước chính:
+
+1. Data ingestion -> Load và validate dataset.
+2. Data Cleaning -> Xử lý missing value.
+3. Feature Engineering -> Engcoding, log, Scale.
+4. Outlier Handling – Loại bỏ giá trị bất thường (IQR, ZScores).
+5. Train/Test Split.
+6. Model Training – Huấn luyện mô hình hồi quy.
+7. Model Evaluation – Đánh giá bằng MSE & R².
+8. Model Registry – Lưu metadata & quản lý version.
+9. Model Promotion – Tự động promote model tốt nhất.
+---
+**ĐÁNH GIÁ CHẤT LƯỢNG MÔ HÌNH**
+-
+***Các chỉ số được log vào metadata của ZenML:***
+- R² score
+
+- Mean Squared Error (MSE)
+
+- Số lượng feature sau preprocessing
+
+- Số mẫu test
+
+***Kết quả mô hình tốt nhất:***
+- R² ≈ 0.93
+
+- MSE ≈ 0.0097
+
+- Số feature sau xử lý: 278
+### **Hướng phát triển**
+---
+Deploy mô hình production bằng MLflow Model Serving
+
+Theo dõi model performance & data drift
+
+Container hóa pipeline với Docker
+
+---
+### **Công nghệ sử dụng**
+
+Language: Python.
+
+MLOps: ZenML, Model Registry, Model Versioning.
+
+Machine Learning: Scikit-learn, Regression, Feature Engineering.
+
+Data: Pandas, NumPy.
+
+Tools: Git (Version Control).
+
+---
 **LIÊN HỆ**
 ---
 Cảm ơn bạn đã ghé thăm dự án của tôi❤️
