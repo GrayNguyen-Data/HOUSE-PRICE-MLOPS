@@ -17,7 +17,7 @@ class ZScoreOutlierDetection(OutlierDetectionStrategy):
     def __init__(self, threshold = 3):
         self._threshold = threshold
     
-    def detected_outliier(self, df):
+    def detected_outlier(self, df):
         logging.info("Phát hiện outlier bằng phương pháp Zscore")
         zscore = np.abs((df - df.mean())/df.std())
         outlier = zscore > self._threshold
@@ -25,7 +25,7 @@ class ZScoreOutlierDetection(OutlierDetectionStrategy):
         return outlier
 
 class IQROutlierDetection(OutlierDetectionStrategy):
-    def detected_outliier(self, df: pd.DataFrame) -> pd.DataFrame:
+    def detected_outlier(self, df: pd.DataFrame) -> pd.DataFrame:
         logging.info("Phát hiện outlier bằng phương pháp IQR")
         Q1 = df.quantile(0.25)
         Q3 = df.quantile(0.75)
@@ -34,7 +34,7 @@ class IQROutlierDetection(OutlierDetectionStrategy):
         logging.info("Hoàn tất việc tìm kiếm outlier với phương pháp IQR")
         return outlier
 
-class OutlierDetetor:
+class OutlierDetector:
     def __init__(self, strategy: OutlierDetectionStrategy):
         self._strategy = strategy
     
