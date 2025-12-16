@@ -56,9 +56,9 @@ zenml init
 ```
 **Bước 6**: Chạy ZenML local
 ```
-zenml up
+zenml login --local --blocking
 ```
-**Bước 6**: Chạy dự án
+**Bước 7**: Chạy dự án
 ```
 python run_pipeline.py
 ```
