@@ -5,6 +5,12 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from zenml import step, Model
 import logging
+from models.stacking import StackingRegressor
+from models.ridge import RidgeRegressor
+from models.xgboost import XGBoostRegressor
+from models.lightgbm import LightGBMRegressor
+from models.random_forest import RandomForestRegressor
+from models.linear import LinearRegressor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -49,12 +55,33 @@ def model_building_step(
 
     y_train_series = y_train.iloc[:, 0]
     logging.info(f"Converted y_train to Series: {y_train_series.shape}")
-    
+    # Inspect features passed to model for debugging
+    try:
+        cols = X_train.columns.tolist()
+        dtypes = X_train.dtypes.to_dict()
+        logging.info(f"[DEBUG] X_train columns ({len(cols)}): {cols[:50]}")
+        logging.info(f"[DEBUG] X_train dtypes sample: {{k: str(v) for k,v in list(dtypes.items())[:20]}}")
+    except Exception:
+        logging.info("[DEBUG] X_train is not a DataFrame or has no columns attribute.")
+
     # Xây dựng pipeline
+    # Use custom stacking as final estimator (scale features first)
     pipeline = Pipeline(
         steps=[
             ("scaler", StandardScaler()),
-            ("model", LinearRegression())
+            (
+                "model",
+                StackingRegressor(
+                    base_models=[
+                        RidgeRegressor(alpha=1.0),
+                        XGBoostRegressor(n_estimators=50, learning_rate=0.1, max_depth=3),
+                        LightGBMRegressor(n_estimators=50, learning_rate=0.1, max_leaves=31),
+                        RandomForestRegressor(n_estimators=50, max_depth=6),
+                    ],
+                    meta_model=LinearRegressor(fit_intercept=True),
+                    n_folds=5,
+                ),
+            ),
         ]
     )
 

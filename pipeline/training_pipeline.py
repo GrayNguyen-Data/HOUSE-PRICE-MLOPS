@@ -1,4 +1,12 @@
 # File: training_pipeline.py (Phiên bản TỐI ƯU/TỰ ĐỘNG)
+import sys
+from pathlib import Path
+
+# Ensure project `src` directory is on sys.path so imports like `from models...` work
+ROOT = Path(__file__).resolve().parents[1]
+SRC_PATH = str(ROOT / "src")
+if SRC_PATH not in sys.path:
+    sys.path.insert(0, SRC_PATH)
 
 from step.data_ingestion_step import data_ingestion_step
 from step.data_splitter_step import data_splitter_step
