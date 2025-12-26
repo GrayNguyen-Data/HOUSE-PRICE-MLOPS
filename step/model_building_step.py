@@ -1,94 +1,218 @@
 from typing import Annotated
+import os
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from zenml import step, Model
 import logging
+
+# ================================
+# Import models & tuner
+# ================================
 from models.stacking import StackingRegressor
 from models.ridge import RidgeRegressor
 from models.xgboost import XGBoostRegressor
 from models.lightgbm import LightGBMRegressor
 from models.random_forest import RandomForestRegressor
 from models.linear import LinearRegressor
+from models.tuning import grid_search_with_metrics
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+# ================================
+# 1️⃣ Logger setup (UTF-8 safe)
+# ================================
+LOG_DIR = "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "model_building.log")
 
+logger = logging.getLogger("stacking_logger")
+logger.setLevel(logging.INFO)
+
+formatter = logging.Formatter(
+    "%(asctime)s - %(levelname)s - %(message)s"
+)
+
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+# ================================
+# 2️⃣ ZenML Model metadata
+# ================================
 model = Model(
     name="prices_predictor",
     version=None,
     license="Apache 2.0",
-    description="Mô hình dự đoán giá nhà"
+    description="Mô hình dự đoán giá nhà",
 )
 
-@step(enable_cache=False, model=model)
+# ================================
+# 3️⃣ Helper: Train vs Val per fold
+# ================================
+def plot_train_vs_val_per_fold(df_metrics: pd.DataFrame, model_name: str):
+    """
+    Vẽ Train vs Validation R² cho TỪNG FOLD
+    -> dùng để phát hiện overfitting theo hành vi, KHÔNG dùng mean
+    """
+    os.makedirs("figures", exist_ok=True)
+    sns.set(style="whitegrid")
+
+    df_plot = df_metrics.copy()
+    df_plot["fold"] = range(1, len(df_plot) + 1)
+
+    df_plot = df_plot.melt(
+        id_vars="fold",
+        value_vars=["train_r2", "val_r2"],
+        var_name="Dataset",
+        value_name="R2",
+    )
+
+    plt.figure(figsize=(10, 5))
+    sns.barplot(
+        data=df_plot,
+        x="fold",
+        y="R2",
+        hue="Dataset",
+    )
+
+    plt.title(f"{model_name} - Train vs Validation R² per fold")
+    plt.xlabel("Fold")
+    plt.ylabel("R² Score")
+    plt.ylim(0, 1.05)
+
+    plt.tight_layout()
+    plt.savefig(
+        f"figures/{model_name}_train_vs_val_per_fold.png",
+        dpi=300,
+    )
+    plt.close()
+
+# ================================
+# 4️⃣ ZenML Step chính
+# ================================
+@step(enable_cache=True, model=model)
 def model_building_step(
     X_train: Annotated[pd.DataFrame, "X_train"],
-    y_train: Annotated[pd.DataFrame, "y_train"]
+    y_train: Annotated[pd.DataFrame, "y_train"],
 ) -> Annotated[Pipeline, "sklearn_pipeline"]:
-    """Xây dựng và train mô hình Linear Regression."""
-    logging.info("=" * 80)
-    logging.info("BẮT ĐẦU MODEL BUILDING STEP")
-    logging.info("=" * 80)
-    
-    logging.info(f"[INPUT] X_train - Shape: {X_train.shape}, Type: {type(X_train).__name__}")
-    if hasattr(X_train, 'columns'):
-        logging.info(f"        First 5 columns: {X_train.columns.tolist()[:5]}")
-    
-    logging.info(f"[INPUT] y_train - Shape: {y_train.shape}, Type: {type(y_train).__name__}")
-    if hasattr(y_train, 'columns'):
-        logging.info(f"        Columns: {y_train.columns.tolist()}")
-    
-    logging.info("=" * 80)
-
-    if not isinstance(X_train, pd.DataFrame):
-        raise TypeError(f"X_train phải là DataFrame, nhận được {type(X_train)}")
-    if not isinstance(y_train, pd.DataFrame):
-        raise TypeError(f"y_train phải là DataFrame, nhận được {type(y_train)}")
-
-    if y_train.shape[1] != 1:
-        raise ValueError(
-            f"   y_train phải có đúng 1 cột, nhận được {y_train.shape[1]} cột.\n"
-            f"   Columns: {y_train.columns.tolist()}\n"
-            f"   Có thể ZenML đã load nhầm artifact!"
-        )
+    """
+    Train base models với GridSearch
+    + vẽ Train vs Validation R² theo TỪNG FOLD
+    """
+    logger.info("=" * 80)
+    logger.info("MODEL BUILDING STEP - auto tuning base models (metric = R2)")
+    logger.info("=" * 80)
 
     y_train_series = y_train.iloc[:, 0]
-    logging.info(f"Converted y_train to Series: {y_train_series.shape}")
-    # Inspect features passed to model for debugging
-    try:
-        cols = X_train.columns.tolist()
-        dtypes = X_train.dtypes.to_dict()
-        logging.info(f"[DEBUG] X_train columns ({len(cols)}): {cols[:50]}")
-        logging.info(f"[DEBUG] X_train dtypes sample: {{k: str(v) for k,v in list(dtypes.items())[:20]}}")
-    except Exception:
-        logging.info("[DEBUG] X_train is not a DataFrame or has no columns attribute.")
 
-    # Xây dựng pipeline
-    # Use custom stacking as final estimator (scale features first)
+    # ============================
+    # Hyperparameter spaces
+    # ============================
+    param_spaces = {
+        "Ridge": {"alpha": [0.1, 1.0, 10.0]},
+        "XGBoost": {
+            "n_estimators": [50, 100],
+            "learning_rate": [0.03, 0.05],
+            "max_depth": [3, 5],
+        },
+        "LightGBM": {
+            "n_estimators": [50, 100],
+            "learning_rate": [0.03, 0.05],
+            "max_leaves": [15, 20],
+        },
+        "RandomForest": {
+            "n_estimators": [50, 100],
+            "max_depth": [5, 10],
+        },
+    }
+
+    base_models = []
+    results_dir = "results"
+    os.makedirs(results_dir, exist_ok=True)
+
+    logger.info("Bắt đầu Grid Search cho từng base model...\n")
+
+    for name, (ModelClass, params) in zip(
+        param_spaces.keys(),
+        zip(
+            [
+                RidgeRegressor,
+                XGBoostRegressor,
+                LightGBMRegressor,
+                RandomForestRegressor,
+            ],
+            param_spaces.values(),
+        ),
+    ):
+        logger.info(f"{name}: bắt đầu tuning (metric = R2)")
+
+        best_model, best_params, df_metrics = grid_search_with_metrics(
+            ModelClass(),
+            params,
+            X_train.values,
+            y_train_series.values,
+            model_name=name,
+        )
+
+        base_models.append(best_model)
+
+        # ========================
+        # Save metrics
+        # ========================
+        csv_path = os.path.join(
+            results_dir, f"{name}_r2_metrics.csv"
+        )
+        df_metrics.to_csv(csv_path, index=False)
+
+        logger.info(f"{name}: metrics lưu tại {csv_path}")
+
+        # ========================
+        # Visualization (per fold)
+        # ========================
+        plot_train_vs_val_per_fold(df_metrics, name)
+        logger.info(
+            f"{name}: đã vẽ Train vs Validation R2 cho từng fold"
+        )
+
+        # ========================
+        # Overfitting diagnosis
+        # ========================
+        overfit_folds = (
+            df_metrics["train_r2"] - df_metrics["val_r2"] > 0.1
+        ).sum()
+
+        logger.info(
+            f"{name}: {overfit_folds}/{len(df_metrics)} folds có dấu hiệu overfitting"
+        )
+
+    # ================================
+    # 5️⃣ Stacking layer
+    # ================================
+    logger.info("\nHuấn luyện StackingRegressor...")
+
+    stack_model = StackingRegressor(
+        base_models=base_models,
+        meta_model=LinearRegressor(),
+        n_folds=5,
+    )
+
     pipeline = Pipeline(
-        steps=[
+        [
             ("scaler", StandardScaler()),
-            (
-                "model",
-                StackingRegressor(
-                    base_models=[
-                        RidgeRegressor(alpha=1.0),
-                        XGBoostRegressor(n_estimators=50, learning_rate=0.1, max_depth=3),
-                        LightGBMRegressor(n_estimators=50, learning_rate=0.1, max_leaves=31),
-                        RandomForestRegressor(n_estimators=50, max_depth=6),
-                    ],
-                    meta_model=LinearRegressor(fit_intercept=True),
-                    n_folds=5,
-                ),
-            ),
+            ("model", stack_model),
         ]
     )
 
-    # Huấn luyện mô hình
-    logging.info("Bắt đầu train mô hình...")
+    logger.info("Fitting pipeline...")
     pipeline.fit(X_train, y_train_series)
-    logging.info("Hoàn tất train mô hình")
-    logging.info("=" * 80)
-    
+
+    logger.info("Training hoàn tất.")
+    logger.info("=" * 80)
+
     return pipeline

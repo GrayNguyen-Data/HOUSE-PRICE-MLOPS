@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 @pipeline(
     model=Model(name="prices_predictor"),
-    enable_cache=False
+    enable_cache=True
 )
 def ml_pipeline() -> Tuple[Annotated[Pipeline, "trained_model_pipeline"], Annotated[dict, "evaluation_metrics"]]:
     """Define an end-to-end machine learning pipeline."""

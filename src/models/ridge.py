@@ -7,6 +7,16 @@ class RidgeRegressor:
         self.coef_ = None
         self.intercept_ = 0.0
 
+    def set_params(self, **params):
+        for k, v in params.items():
+            if k == "alpha":
+                self.alpha = float(v)
+            elif k == "fit_intercept":
+                self.fit_intercept = bool(v)
+            else:
+                setattr(self, k, v)
+        return self
+
     def fit(self, X, y):
         X = np.asarray(X, dtype=float)
         y = np.asarray(y, dtype=float)

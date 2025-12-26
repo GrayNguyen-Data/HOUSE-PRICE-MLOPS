@@ -11,24 +11,28 @@ class _XGNode:
         self.gain = None
 
 class XGBoostRegressor:
-    """A simplified XGBoost-like regressor using second-order approximation.
-
-    This implementation uses squared error loss (hessian = 1) and computes
-    leaf weights with regularization: w = -G / (H + lambda).
-    Splits are chosen by maximizing gain.
-    """
+    """A simplified XGBoost-like regressor using second-order approximation."""
     def __init__(self, n_estimators=50, learning_rate=0.1, max_depth=3, min_samples_split=2, lam=1.0, gamma=0.0):
         self.n_estimators = int(n_estimators)
         self.learning_rate = float(learning_rate)
-        self.max_depth = max_depth
-        self.min_samples_split = min_samples_split
+        self.max_depth = int(max_depth)
+        self.min_samples_split = int(min_samples_split)
         self.lam = float(lam)
         self.gamma = float(gamma)
         self.trees = []
         self.init_pred = 0.0
 
+    def set_params(self, **params):
+        for k, v in params.items():
+            if k in ("n_estimators", "max_depth", "min_samples_split"):
+                setattr(self, k, int(v))
+            elif k in ("learning_rate", "lam", "gamma"):
+                setattr(self, k, float(v))
+            else:
+                setattr(self, k, v)
+        return self
+
     def _calc_grad_hess(self, y, y_pred):
-        # For squared error: loss = 0.5*(y - y_pred)^2
         g = y_pred - y
         h = np.ones_like(g)
         return g, h
@@ -37,7 +41,6 @@ class XGBoostRegressor:
         node = _XGNode()
         G = g.sum()
         H = h.sum()
-        # compute leaf weight
         node.value = -G / (H + self.lam)
         if depth >= self.max_depth or X.shape[0] < self.min_samples_split:
             return node
@@ -89,7 +92,6 @@ class XGBoostRegressor:
         for m in range(self.n_estimators):
             g, h = self._calc_grad_hess(y, y_pred)
             tree = self._build_tree(X, g, h, depth=0)
-            # update predictions
             update = np.array([self._predict_row(row, tree) for row in X])
             y_pred = y_pred + self.learning_rate * update
             self.trees.append(tree)

@@ -6,7 +6,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-@step(enable_cache=False)
+@step(enable_cache=True)
 def data_splitter_step(
     df: Annotated[pd.DataFrame, "transformed_data"],
     target_column: str

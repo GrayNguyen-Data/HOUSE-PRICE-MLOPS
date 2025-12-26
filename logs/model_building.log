@@ -1,0 +1,14 @@
+2025-12-26 16:27:48,824 - INFO - ================================================================================
+2025-12-26 16:27:48,824 - INFO - MODEL BUILDING STEP - auto tuning base models (metric = R2)
+2025-12-26 16:27:48,840 - INFO - ================================================================================
+2025-12-26 16:27:48,840 - INFO - Bắt đầu Grid Search cho từng base model...
+
+2025-12-26 16:27:48,840 - INFO - Ridge: bắt đầu tuning (metric = R2)
+2025-12-26 16:27:49,063 - INFO - Ridge: metrics lưu tại results\Ridge_r2_metrics.csv
+2025-12-26 16:27:49,764 - INFO - Ridge: đã vẽ Train vs Validation R2 cho từng fold
+2025-12-26 16:27:49,764 - INFO - Ridge: 0/3 folds có dấu hiệu overfitting
+2025-12-26 16:27:49,764 - INFO - XGBoost: bắt đầu tuning (metric = R2)
+2025-12-26 19:20:40,419 - INFO - XGBoost: metrics lưu tại results\XGBoost_r2_metrics.csv
+2025-12-26 19:20:41,765 - INFO - XGBoost: đã vẽ Train vs Validation R2 cho từng fold
+2025-12-26 19:20:41,768 - INFO - XGBoost: 0/8 folds có dấu hiệu overfitting
+2025-12-26 19:20:41,774 - INFO - LightGBM: bắt đầu tuning (metric = R2)

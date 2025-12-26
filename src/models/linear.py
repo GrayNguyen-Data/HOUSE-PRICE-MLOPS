@@ -1,35 +1,39 @@
 import numpy as np
 
 class LinearRegressor:
-    """Ordinary Least Squares linear regression (closed-form).
-
-    Minimizes squared error: w = (X^T X)^-1 X^T y
-    """
-    def __init__(self, fit_intercept=True):
+    def __init__(self, fit_intercept = True):
         self.fit_intercept = fit_intercept
-        self.coef_ = None
-        self.intercept_ = 0.0
+        self.coef = None
+        self.intercept = 0.0
+
+    def set_params(self, **params):
+        for k, v in params.items():
+            if k == "fit_intercept":
+                self.fit_intercept = bool(v)
+            else:
+                setattr(self, k, v)
+        return self
 
     def fit(self, X, y):
-        X = np.asarray(X, dtype=float)
-        y = np.asarray(y, dtype=float)
-        n_samples = X.shape[0]
+        X = np.asarray(X, dtype =float)
+        y = np.asarray(y, dtype =float)
+        sum_samples = X.shape[0]
         if self.fit_intercept:
-            X_design = np.hstack([np.ones((n_samples, 1)), X])
+            X_new = np.hstack([np.ones((sum_samples, 1)), X])
         else:
-            X_design = X
+            X_new = X
 
-        # Solve normal equation with pseudo-inverse for stability
-        w, *_ = np.linalg.lstsq(X_design, y, rcond=None)
+        W = np.linalg.inv(X_new.T @ X_new) @ X_new.T @ y
 
         if self.fit_intercept:
-            self.intercept_ = float(w[0])
-            self.coef_ = w[1:]
+            self.intercept = float(W[0])
+            self.coef = W[1:]
         else:
-            self.intercept_ = 0.0
-            self.coef_ = w
+            self.intercept = 0.0
+            self.coef = W
+
         return self
 
     def predict(self, X):
-        X = np.asarray(X, dtype=float)
-        return X.dot(self.coef_) + self.intercept_
+        X = np.asarray(X, dtype = float)
+        return X @ self.coef + self.intercept
